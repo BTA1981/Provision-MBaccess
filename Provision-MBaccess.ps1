@@ -21,6 +21,8 @@
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
 #Set Error Action to Silently Continue
 $ErrorActionPreference = 'SilentlyContinue'
+[string]$DateStr = (Get-Date).ToString("s").Replace(":","-") # +"_" # Easy sortable date string
+Start-Transcript ('c:\windows\temp\' + $DateStr  + '_Provision-MBaccess.log') # Start logging 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 # Variables
 If (!Get-Module activedirectory) { import-module activedirectory}
@@ -49,16 +51,16 @@ if (!$Session) {
 $AllSharedMailboxes = Get-mailbox -RecipientTypeDetails sharedmailbox -Resultsize unlimited | Select-Object -ExpandProperty name # Get current list of shared mailboxes
 $AllSharedMailboxesWithPB_Group = @()
 
-#$ErrorActionPreference = 'stop'
+$ErrorActionPreference = 'stop'
 
 ForEach ($MBname in $AllSharedMailboxes) {
     Try {
-        Get-ADgroup ("PB_" + $MBname) 
+        Get-ADgroup ("PB_" + $MBname) -ErrorAction Stop
         $AllSharedMailboxesWithPB_Group += $MBName 
     }
     Catch {
         Write-Output "Security Group [$MBName] does not exist" | out-file "C:\temp\MailboxDoesNotExist.log" -Append
-        #Continue
+        Continue
     } # End Catch
 } # End ForEAch
 
@@ -70,65 +72,82 @@ $ErrorActionPreference = 'silentlycontinue'
     # Add permissions for all these members to the mailbox
 ForEach ($Mailbox in $AllSharedMailboxesWithPB_Group) {
     
-    If ($Mailbox -like "AchterhoekFACTBegeleiding") { # for testing purposes
+    #If ($Mailbox -like "AchterhoekFACTBegeleiding") { # for testing purposes
         
         
     $MailboxString = (Get-Mailbox $Mailbox) | Select-Object -ExpandProperty name    
     #$MailboxString = $MailboxObject | Select-Object -ExpandProperty name
           
     # Extract members of the distribution group "PB_"<Mailbox name>
-    #$CurrentDistributionGroupMembersArray = Get-DistributionGroupMember -identity ("PB_" + $MailboxString) | Select-Object -ExpandProperty name # Do not remove, this is for live environment
-    $PB_AchterhoekFACTBegeleiding = Get-DistributionGroupMember -identity ("PB_" + "AchterhoekFACTBegeleiding") | Select-Object -ExpandProperty WindowsLiveID #TEST
+    $CurrentDistributionGroupMembersArray = Get-DistributionGroupMember -identity ("PB_" + $MailboxString) | Select-Object -ExpandProperty WindowsLiveID # Do not remove, this is for live environment
+    #$PB_AchterhoekFACTBegeleiding = Get-DistributionGroupMember -identity ("PB_" + "AchterhoekFACTBegeleiding") | Select-Object -ExpandProperty WindowsLiveID #TEST
     Write-Output "Current Group: $MailboxString" # test
     
     # Get members that currently have access rights
-    $CurrentMailBoxRights = Get-mailbox -Identity achterhoekfactbegeleiding | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@iriszorg.nl"}
+    #$CurrentMailBoxRights = Get-mailbox -Identity achterhoekfactbegeleiding | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@iriszorg.nl"} # TEST
+    $CurrentMailBoxRights = Get-mailbox -Identity $Mailbox | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@iriszorg.nl"} -ErrorAction SilentlyContinue # TEST
+
 
 
     Try {    
-        
-        # Compare list of users that have mailbox rights with members of the PB_ Security Group 
-        $UsersToAdd = compare-object -ReferenceObject $PB_AchterhoekFACTBegeleiding -DifferenceObject $CurrentMailBoxRights
-        Write-Host "Adding following users to [$Mailbox].." -ForegroundColor Green
-        $UsersToAdd | Format-Table
+        If ($CurrentMailBoxRights -eq $Null) {
+            Write-Host "There are no mailbox rights set, only adding users.."
+            $UsersToAdd = $CurrentDistributionGroupMembersArray
+            $UsersToRemove = $Null
+        }
+        Else {
 
-        $UsersToRemove = compare-object -ReferenceObject $CurrentMailBoxRights -DifferenceObject $PB_AchterhoekFACTBegeleiding
-        Write-Host "Removing following users to [$Mailbox].." -ForegroundColor Yellow 
-        $UsersToRemove | Format-Table
+            # Compare list of users that have mailbox rights with members of the PB_ Security Group 
+            $UsersToAdd = compare-object -ReferenceObject $CurrentDistributionGroupMembersArray -DifferenceObject $CurrentMailBoxRights
+            Write-Host "Adding following users to [$Mailbox].." -ForegroundColor Green
+            $UsersToAdd = $UsersToAdd | where { $_.SideIndicator -like "<="} 
+            $UsersToAdd = $UsersToAdd | Select -ExpandProperty InputObject
 
+            $UsersToAdd | Format-Table
+
+            $UsersToRemove = compare-object -ReferenceObject $CurrentMailBoxRights -DifferenceObject $CurrentDistributionGroupMembersArray
+            Write-Host "Removing following users to [$Mailbox].." -ForegroundColor Yellow 
+            $UsersToRemove = $UsersToRemove | where { $_.SideIndicator -like "<="} 
+            $UsersToRemove = $UsersToRemove | Select -ExpandProperty InputObject
+
+            $UsersToRemove | Format-Table
+        }
 
         # Add rights for all users that are new in the PB_ Security Group
 
         #ForEach ($Member in $CurrentDistributionGroupMembersArray) {
         ForEach ($MemberUser1 in $UsersToAdd) { #TEST
-        Write-Output "Current member: $Member"
+        Write-Output "Current member: $Member1"
                     # Add mailbox permissions with inheritance to child folders within mailbox
-            Add-MailboxPermission -Identity $MailboxString -User $MemberUser1 -AccessRights $AccessRights -InheritanceType All -WhatIf
-            Add-RecipientPermission -Identity $MailboxString -Trustee $MemberUser1 -AccessRights SendAs -confirm:$False -whatif
+            Add-MailboxPermission -Identity $MailboxString -User $MemberUser1 -AccessRights $AccessRights -InheritanceType All -verbose #-whatif
+            Add-RecipientPermission -Identity $MailboxString -Trustee $MemberUser1 -AccessRights SendAs -confirm:$False -verbose #-whatif
         }
         
 
         # Remove rights for all users that currently have rights for the mailbox but aren't member of the PB_ Security group.
-        ForEach ($MemberUser2 in $UsersToAdd) { #TEST
-        Write-Output "Current member: $Member"
-                    # Add mailbox permissions with inheritance to child folders within mailbox
-            Remove-MailboxPermission -Identity $MailboxString -User $MemberUser2 -AccessRights $AccessRights -InheritanceType All -WhatIf
-            Remove-RecipientPermission -Identity $MailboxString -Trustee $MemberUser2 -AccessRights SendAs -confirm:$False -whatif
+        If ($UsersToRemove -ne $Null) { # Don't remove user rights when there are none set!
+            ForEach ($MemberUser2 in $UsersToRemove) { 
+            Write-Output "Current member: $Member2"
+                        # Add mailbox permissions with inheritance to child folders within mailbox
+                Remove-MailboxPermission -Identity $MailboxString -User $MemberUser2 -AccessRights $AccessRights -InheritanceType All -Confirm:$false -verbose #-WhatIf
+                Remove-RecipientPermission -Identity $MailboxString -Trustee $MemberUser2 -AccessRights SendAs -confirm:$False -verbose #-whatif
+            }
         }
-
+        $CurrentMailBoxRights = $Null # reset value 
+        $UsersToRemove = $Null # reset value
         # View Result
         Get-MailboxPermission -Identity $Mailbox | Format-Table
 
 
 
-    }
+    } # End Try
     Catch {
         Write-Output "An error occured with setting rights for [$MailboxString]"
 
     }
 
 
-} # End If
+#} # End If
 Else {
     continue 
     # NEXT
@@ -136,6 +155,7 @@ Else {
 
 
 }
+Stop-Transcript
 
 
 
