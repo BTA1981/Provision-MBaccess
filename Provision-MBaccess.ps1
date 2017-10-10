@@ -8,10 +8,10 @@
     
     Prerequisites: Modules ActiveDirectory, GroupPolicy
 .NOTES
-  Version:        1.0
-  Author:         Bart Tacken - Client ICT Groep
-  Creation Date:  21-02-2017
-  Purpose/Change: Initial script development
+  Version:          1.1 Tested and working version
+                    1.0 Initial script development
+  Author:           Bart Tacken - Client ICT Groep
+  Creation Date:    21-02-2017
 .EXAMPLE
     
 #>
@@ -24,7 +24,7 @@ Start-Transcript ('c:\windows\temp\' + $DateStr  + '_Provision-MBaccess.log') # 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 # Variables
 If (!Get-Module activedirectory) { import-module activedirectory}
-#$CSVpath = "C:\temp\iriszorg\GroupsAndMailboxesDemo.csv"
+#$CSVpath = "C:\temp\GroupsAndMailboxesDemo.csv"
 #$CSV = Import-CSV $CSVpath
 $AccessRights = 'FullAccess'
 $CurrentMemberArray = @() 
@@ -82,8 +82,8 @@ ForEach ($Mailbox in $AllSharedMailboxesWithPB_Group) {
     Write-Output "Current Group: $MailboxString" # test
     
     # Get members that currently have access rights
-    #$CurrentMailBoxRights = Get-mailbox -Identity achterhoekfactbegeleiding | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@iriszorg.nl"} # TEST
-    $CurrentMailBoxRights = Get-mailbox -Identity $Mailbox | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@iriszorg.nl"} -ErrorAction SilentlyContinue # TEST
+    #$CurrentMailBoxRights = Get-mailbox -Identity achterhoekfactbegeleiding | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@domain.nl"} # TEST
+    $CurrentMailBoxRights = Get-mailbox -Identity $Mailbox | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@domain.nl"} -ErrorAction SilentlyContinue # TEST
 
 
 
@@ -154,258 +154,3 @@ Else {
 
 }
 Stop-Transcript
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#write-output $CurrentDistributionGroupMembersArray
-
-
-
-
-
-
-<#
-
-
-    $CurrentMemberArray += New-Object -TypeName PSObject -Property @{ # Fill Array with custom objects
-        'Group' = $Group
-        'members' = $CurrentDistributionGroupMembersArray
-    } # End PS Object
-
-    ForEach ($Member in $CurrentDistributionGroupMembersArray) {
-        #Write-Output $Member.DisplayName       
-        Write-Output $Member
-    }
-}
-
-write-host $CurrentMemberArray
-
-
-
-$NewDistributionGroupMembersArray = @()
-
-# Compare current distribution list members with listed full access rights mailbox
-ForEach ($Row in $CSV) {
-    
-    $MailboxObject = Get-Mailbox $Row.Mailbox
-    $MailboxString = $MailboxObject | Select-Object -ExpandProperty userprincipalname
-    $DistributionGroup = Get-DistributionGroup -identity $Row.Group 
-    $NewDistributionGroupMembersArray = Get-DistributionGroupMember -identity $Row.Group
-
-
-    # Compare current AD group members with members listed in mailbox rights
-
-    $NewrrentDistributionGroupMembersArray = Get-DistributionGroupMember -identity $Group | Select-Object -ExpandProperty name
-    Write-Output "Current Group: $Group"
-    
-    $NewMemberArray += New-Object -TypeName PSObject -Property @{ # Fill Array with custom objects
-        'Group' = $Group
-        'members' = $CurrentDistributionGroupMembersArray
-    } # End PS Object
-
-
-
-
-    Compare-Object -ReferenceObject $CurrentMemberArray -DifferenceObject $NewDistributionGroupMembersArray
-
-    
-    ForEach ($Member in $DistributionGroupMembersArray) {
-        Write-Output $Member.DistinguishedName
-        
-        # Add mailbox permissions with inheritance to child folders within mailbox
-        #Add-MailboxPermission -Identity $MailboxString -User $($member.samaccountname) -AccessRights $AccessRights -InheritanceType All  
-
-
-    }
-}
-
-
-
-
-
-
-#>
-
-
-
-
-
-<#
-# Loop through CSV and provide access rights:
-ForEach ($Row in $CSV) {
-    
-    $MailboxObject = Get-Mailbox $Row.Mailbox
-    $MailboxString = $MailboxObject | Select-Object -ExpandProperty userprincipalname
-    #$DistributionGroup = Get-DistributionGroup -identity $Row.Group 
-    $NewDistributionGroupMembersArray = @()
-
-    $NewDistributionGroupMembersArray = Get-DistributionGroupMember -identity $Row.Group
-
-    
-    ForEach ($Member in $DistributionGroupMembersArray) {
-        #Write-Output $Member.DisplayName
-        Write-Output $Member.DistinguishedName
-        
-        # Add mailbox permissions with inheritance to child folders within mailbox
-        Add-MailboxPermission -Identity $MailboxString -User $($member.samaccountname) -AccessRights $AccessRights -InheritanceType All  
-
-
-    }
-}
-#>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#>
-
-<#
-
-
-    
-    Write-Log "ALERT: Expand distribution group membership. [$($CheckDelegate.Name)]"
-            ForEach ($Member in Get-DistributionGroupMember $CheckDelegate.Name -ResultSize Unlimited) {
-                $CheckMember = Get-Recipient $Member -ErrorAction SilentlyContinue
-                If ($CheckMember -ne $null) {
-                    $DelegateName = $DelegateID + ":" + $CheckMember.Name
-                    $DelegateEmail = $CheckMember.PrimarySmtpAddress
-                    "$MailboxName,$MailboxEmail,$DelegateName,$DelegateEmail,$DelegateAccess" | Out-File $ExportFile -Append } } }
-    
-    
-    
-       
-    [string]$MailboxEmail = $Mailbox.PrimarySmtpAddress
-    $CheckMailbox = Get-Recipient $MailboxEmail -ErrorAction SilentlyContinue
-    If ($CheckMailbox -eq $null) { Write-Log "ERROR: Mailbox not found. [$MailboxEmail]"; Continue }
-    [string]$MailboxName = $CheckMailbox.Name
-    [string]$MailboxDN = $CheckMailbox.DistinguishedName
-    $Progress = $Progress + 1
-    Write-Log ""; Write-Log "INFO: Audit mailbox $Progress of $MailboxCount. [$MailboxEmail]"
-
-    # --- Export mailbox access permissions
-
-    If ($IncludeMailboxAccess -eq $true) {
-        Write-Log "AUDIT: Mailbox access permissions..."
-        $Delegates = @()
-        $Delegates = (Get-MailboxPermission $MailboxDN | Where { $DelegatesToSkip -notcontains $_.User -and $_.IsInherited -eq $false })
-        If ($Delegates -ne $null) {
-            ForEach ($Delegate in $Delegates) {
-                $DelegateAccess = $Delegate.AccessRights
-                Check-Delegates $Delegate.User $MailboxAccessExport } } }
-
-    # --- Export SendAs permissions
-
-    If ($IncludeSendAs -eq $true) {
-        Write-Log "AUDIT: Send As permissions..."
-        $Delegates = @()
-        $Delegates = Get-ADPermission $MailboxDN | Where { $DelegatesToSkip -notcontains $_.User -and $_.ExtendedRights -like "*send-as*" }
-        If ($Delegates -ne $null) {
-            ForEach ($Delegate in $Delegates) {
-                $DelegateAccess = "SendAs" 
-                Check-Delegates $Delegate.User $SendAsExport } } }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ForEach ($Mailbox in $Mailboxes) {
-    [string]$MailboxEmail = $Mailbox.PrimarySmtpAddress
-    $CheckMailbox = Get-Recipient $MailboxEmail -ErrorAction SilentlyContinue
-    If ($CheckMailbox -eq $null) { Write-Log "ERROR: Mailbox not found. [$MailboxEmail]"; Continue }
-    [string]$MailboxName = $CheckMailbox.Name
-    [string]$MailboxDN = $CheckMailbox.DistinguishedName
-    $Progress = $Progress + 1
-    Write-Log ""; Write-Log "INFO: Audit mailbox $Progress of $MailboxCount. [$MailboxEmail]"
-
-    # --- Export mailbox access permissions
-
-    If ($IncludeMailboxAccess -eq $true) {
-        Write-Log "AUDIT: Mailbox access permissions..."
-        $Delegates = @()
-        $Delegates = (Get-MailboxPermission $MailboxDN | Where { $DelegatesToSkip -notcontains $_.User -and $_.IsInherited -eq $false })
-        If ($Delegates -ne $null) {
-            ForEach ($Delegate in $Delegates) {
-                $DelegateAccess = $Delegate.AccessRights
-                Check-Delegates $Delegate.User $MailboxAccessExport } } }
-
-    # --- Export SendAs permissions
-
-    If ($IncludeSendAs -eq $true) {
-        Write-Log "AUDIT: Send As permissions..."
-        $Delegates = @()
-        $Delegates = Get-ADPermission $MailboxDN | Where { $DelegatesToSkip -notcontains $_.User -and $_.ExtendedRights -like "*send-as*" }
-        If ($Delegates -ne $null) {
-            ForEach ($Delegate in $Delegates) {
-                $DelegateAccess = "SendAs" 
-                Check-Delegates $Delegate.User $SendAsExport } } }
-
-                #>
