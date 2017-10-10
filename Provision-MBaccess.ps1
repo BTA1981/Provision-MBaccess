@@ -3,8 +3,6 @@
 .SYNOPSIS
     Read members of a certain group en add them to a shared mailbox.
     Script also needs be te able to update and remove users from a mailbox.
-
-    Script is not fully tested.
     
 .DESCRIPTION
     
