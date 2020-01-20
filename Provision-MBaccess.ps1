@@ -78,11 +78,9 @@ ForEach ($Mailbox in $AllSharedMailboxesWithPB_Group) {
           
     # Extract members of the distribution group "PB_"<Mailbox name>
     $CurrentDistributionGroupMembersArray = Get-DistributionGroupMember -identity ("PB_" + $MailboxString) | Select-Object -ExpandProperty WindowsLiveID # Do not remove, this is for live environment
-    #$PB_AchterhoekFACTBegeleiding = Get-DistributionGroupMember -identity ("PB_" + "AchterhoekFACTBegeleiding") | Select-Object -ExpandProperty WindowsLiveID #TEST
     Write-Output "Current Group: $MailboxString" # test
     
-    # Get members that currently have access rights
-    #$CurrentMailBoxRights = Get-mailbox -Identity achterhoekfactbegeleiding | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@domain.nl"} # TEST
+    # Get members that currently have access right
     $CurrentMailBoxRights = Get-mailbox -Identity $Mailbox | get-mailboxpermission | Select-Object -ExpandProperty user | where { $_ -like "*@domain.nl"} -ErrorAction SilentlyContinue # TEST
 
 
